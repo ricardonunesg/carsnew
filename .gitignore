@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vscode/
+.env
+vendure.sqlite
+static/assets/
+static/email/test-emails/
+pm2-*.log
+*.tar.gz
