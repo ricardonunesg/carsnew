@@ -2,9 +2,9 @@ import {
   dummyPaymentHandler,
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
-  DefaultSearchPlugin,
   VendureConfig,
 } from '@vendure/core';
+import { ElasticsearchPlugin } from '@vendure/elasticsearch-plugin';
 import {
   defaultEmailHandlers,
   EmailPlugin,
@@ -54,9 +54,16 @@ export const config: VendureConfig = {
 
     DefaultJobQueuePlugin,
     DefaultSchedulerPlugin,
-    DefaultSearchPlugin,
 
-    // Email em modo de desenvolvimento (precisa de 'route')
+    // 🔍 Elasticsearch como motor de busca
+    ElasticsearchPlugin.init({
+      indexPrefix: 'carsandvibes',
+      clientOptions: {
+        node: process.env.ELASTIC_NODE ?? 'http://127.0.0.1:9200',
+      },
+    }),
+
+    // 📧 Email em modo de desenvolvimento
     EmailPlugin.init({
       devMode: true,
       route: 'mailbox',
@@ -67,9 +74,7 @@ export const config: VendureConfig = {
       ),
     }),
 
-
-
-    // Admin UI (Vite) a correr numa porta separada em dev
+    // 🧭 Admin UI
     AdminUiPlugin.init({
       route: 'admin',
       port: 3002,

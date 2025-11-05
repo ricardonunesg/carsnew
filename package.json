@@ -16,6 +16,7 @@
     "@vendure/asset-server-plugin": "3.5.0",
     "@vendure/core": "3.5.0",
     "@vendure/dashboard": "3.5.0",
+    "@vendure/elasticsearch-plugin": "^3.5.0",
     "@vendure/email-plugin": "3.5.0",
     "@vendure/graphiql-plugin": "^3.5.0",
     "better-sqlite3": "12.4.1",
