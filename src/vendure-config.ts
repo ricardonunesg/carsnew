@@ -24,7 +24,7 @@ export const config: VendureConfig = {
     adminApiPath: 'admin-api',
     shopApiPath: 'shop-api',
     hostname: '0.0.0.0',
-    trustProxy: IS_DEV ? false : 1,
+trustProxy: 1,
   },
 
   authOptions: {
@@ -75,9 +75,9 @@ export const config: VendureConfig = {
     }),
 
     // 🧭 Admin UI
-    AdminUiPlugin.init({
-      route: 'admin',
-      port: 3002,
-    }),
+AdminUiPlugin.init({
+  route: 'admin',
+  port: serverPort, // usa o mesmo servidor da API
+}),
   ],
 };

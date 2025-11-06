@@ -29,5 +29,5 @@
     "concurrently": "9.2.1",
     "typescript": "5.8.2"
   },
-  "type": "commonjs"
+  "type": "module"
 }

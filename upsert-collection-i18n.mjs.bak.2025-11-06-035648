@@ -1,0 +1,198 @@
+// /root/carsandvibes/upsert-collection-i18n.mjs
+// Node v20+. Faz login, cria/atualiza Collections e aplica traduções (pt, en, es, fr)
+// com normalização de códigos de língua (pt_PT -> pt, fr_FR -> fr, ...).
+
+import fs from 'fs';
+
+const endpoint = process.env.ADMIN_API_URL ?? 'http://127.0.0.1:3000/admin-api';
+const username = process.env.VENDURE_USER ?? 'superadmin';
+const password = process.env.VENDURE_PASS ?? 'superadmin';
+
+/* ========= Normalização de idiomas ========= */
+const LANG_MAP = {
+  'pt': 'pt', 'pt-pt': 'pt', 'pt_pt': 'pt', 'pt-PT': 'pt', 'pt_PT': 'pt',
+  'en': 'en', 'en-gb': 'en', 'en_us': 'en', 'en-GB': 'en', 'en-US': 'en',
+  'es': 'es', 'es-es': 'es', 'es_ES': 'es',
+  'fr': 'fr', 'fr-fr': 'fr', 'fr_FR': 'fr', 'fr-CA': 'fr', 'fr_CH': 'fr',
+};
+const normLang = (x) => LANG_MAP[String(x || '').trim()] || String(x || '').trim();
+
+/* =================== GraphQL =================== */
+const LOGIN = `
+mutation ($u:String!, $p:String!, $r:Boolean!) {
+  login(username:$u, password:$p, rememberMe:$r) {
+    __typename
+    ... on CurrentUser { id identifier }
+    ... on InvalidCredentialsError { message }
+    ... on NativeAuthStrategyError { message }
+  }
+}`;
+
+const GET_BY_SLUG = `
+query ($slug:String!) {
+  collections(options:{ filter:{ slug:{ eq:$slug } }, take:1 }) {
+    items {
+      id
+      slug
+      name
+      translations { id languageCode name slug description }
+      parent { id }
+    }
+    totalItems
+  }
+}`;
+
+const CREATE_COLLECTION = `
+mutation ($input: CreateCollectionInput!) {
+  createCollection(input:$input) {
+    id
+    slug
+    name
+    translations { languageCode name slug description }
+    parent { id }
+  }
+}`;
+
+const UPDATE_COLLECTION = `
+mutation ($input: UpdateCollectionInput!) {
+  updateCollection(input:$input) {
+    id
+    slug
+    name
+    translations { languageCode name slug description }
+    parent { id }
+  }
+}`;
+
+/* =================== Helpers =================== */
+async function gql(query, variables = {}, cookieHeader = '') {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const text = await res.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(`Resposta não-JSON do servidor: ${text}`);
+  }
+  return { json, headers: res.headers };
+}
+
+function cookiesFromSetCookie(setCookieHeader) {
+  if (!setCookieHeader) return '';
+  // Pode vir múltiplo; une name=value de cada cookie
+  const parts = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+  const pairs = parts.map(h => String(h).split(';')[0]).filter(Boolean);
+  return pairs.join('; ');
+}
+
+function parseCsv(path) {
+  const raw = fs.readFileSync(path, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+  // Espera: slug;parentId;pt_name;pt_desc;en_name;en_desc;es_name;es_desc;fr_name;fr_desc
+  return lines.map((l, i) => {
+    const cols = l.split(';');
+    if (cols.length < 10) {
+      throw new Error(`CSV linha ${i+1}: esperado 10 colunas, obtido ${cols.length}. Linha: ${l}`);
+    }
+    const [slug, parentId, pt_name, pt_desc, en_name, en_desc, es_name, es_desc, fr_name, fr_desc] = cols;
+    return {
+      slug: slug.trim(),
+      parentId: parentId.trim(),
+      pt_name: pt_name.trim(), pt_desc: (pt_desc ?? '').trim(),
+      en_name: en_name.trim(), en_desc: (en_desc ?? '').trim(),
+      es_name: es_name.trim(), es_desc: (es_desc ?? '').trim(),
+      fr_name: fr_name.trim(), fr_desc: (fr_desc ?? '').trim(),
+    };
+  });
+}
+
+/* =================== Main =================== */
+async function main() {
+  const csvPath = process.argv[2];
+  if (!csvPath) {
+    console.error('Uso: node upsert-collection-i18n.mjs /caminho/ficheiro.csv');
+    process.exit(2);
+  }
+
+  console.log(`A autenticar em ${endpoint}`);
+  const { json: loginJson, headers } = await gql(LOGIN, { u: username, p: password, r: true });
+  if (loginJson.errors?.length) {
+    console.error('Falha no login:', JSON.stringify(loginJson.errors, null, 2));
+    process.exit(1);
+  }
+  const typename = loginJson?.data?.login?.__typename;
+  if (typename !== 'CurrentUser') {
+    console.error('Falha no login:', JSON.stringify(loginJson, null, 2));
+    process.exit(1);
+  }
+  const cookieHeader = cookiesFromSetCookie(headers.get('set-cookie'));
+  console.log(`Login OK como ${loginJson.data.login.identifier}`);
+
+  const rows = parseCsv(csvPath);
+
+  for (const row of rows) {
+    const slug = row.slug;
+    // Translations — sempre com códigos normalizados do enum Vendure
+    const translations = [
+      { languageCode: normLang('pt'), name: row.pt_name, slug, description: row.pt_desc || '' },
+      { languageCode: normLang('en'), name: row.en_name, slug, description: row.en_desc || '' },
+      { languageCode: normLang('es'), name: row.es_name, slug, description: row.es_desc || '' },
+      { languageCode: normLang('fr'), name: row.fr_name, slug, description: row.fr_desc || '' },
+    ];
+
+    // Garantia adicional (mesmo que venham ”fr_FR“, etc.)
+    for (const t of translations) t.languageCode = normLang(t.languageCode);
+
+    try {
+      // Existe?
+      const { json: getJson } = await gql(GET_BY_SLUG, { slug }, cookieHeader);
+      const existing = getJson?.data?.collections?.items?.[0];
+
+      if (!existing) {
+        // Criar
+        const input = {
+          parentId: row.parentId,
+          inheritFilters: true,
+          filters: [],
+          translations,
+        };
+        const { json: createJson } = await gql(CREATE_COLLECTION, { input }, cookieHeader);
+        if (createJson.errors?.length) {
+          console.log(`› ${slug} … erro: Falha a criar: ${JSON.stringify(createJson, null, 2)}`);
+        } else {
+          const c = createJson.data.createCollection;
+          console.log(`✓ criado: ${c.slug} (id ${c.id})`);
+        }
+      } else {
+        // Atualizar (inclui traduções)
+        const input = {
+          id: existing.id,
+          translations,
+          parentId: row.parentId,
+          inheritFilters: true,
+        };
+        const { json: updJson } = await gql(UPDATE_COLLECTION, { input }, cookieHeader);
+        if (updJson.errors?.length) {
+          console.log(`› ${slug} … erro: Falha a atualizar: ${JSON.stringify(updJson, null, 2)}`);
+        } else {
+          const c = updJson.data.updateCollection;
+          console.log(`✓ atualizado: ${c.slug} (id ${c.id})`);
+        }
+      }
+    } catch (err) {
+      console.log(`› ${slug} … erro inesperado:`, err?.message || err);
+    }
+  }
+}
+
+main().catch(err => {
+  console.error('Erro inesperado:', err);
+  process.exit(99);
+});

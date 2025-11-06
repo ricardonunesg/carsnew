@@ -1,0 +1,171 @@
+// /root/carsandvibes/upsert-collection-i18n.mjs
+// Node v20+. Faz login, cria/atualiza Collections e aplica traduções (pt, en, es, fr).
+
+import fs from 'fs';
+
+const endpoint = process.env.ADMIN_API_URL ?? 'http://127.0.0.1:3000/admin-api';
+const username = process.env.VENDURE_USER ?? 'superadmin';
+const password = process.env.VENDURE_PASS ?? 'superadmin';
+
+/* =================== GraphQL =================== */
+const LOGIN = `
+mutation ($u:String!, $p:String!, $r:Boolean!) {
+  login(username:$u, password:$p, rememberMe:$r) {
+    __typename
+    ... on CurrentUser { id identifier }
+    ... on InvalidCredentialsError { message }
+    ... on NativeAuthStrategyError { message }
+  }
+}`;
+
+const GET_BY_SLUG = `
+query ($slug:String!) {
+  collections(options:{ filter:{ slug:{ eq:$slug } }, take:1 }) {
+    items {
+      id
+      slug
+      name
+      translations { id languageCode name slug description }
+    }
+    totalItems
+  }
+}`;
+
+const CREATE_COLLECTION = `
+mutation ($input: CreateCollectionInput!) {
+  createCollection(input:$input) {
+    id
+    slug
+    name
+    translations { languageCode name slug description }
+  }
+}`;
+
+const UPDATE_COLLECTION = `
+mutation ($input: UpdateCollectionInput!) {
+  updateCollection(input:$input) {
+    id
+    slug
+    name
+    translations { languageCode name slug description }
+  }
+}`;
+
+/* =================== Helpers =================== */
+async function gql(query, variables = {}, cookie = '') {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  const setCookie = res.headers.get('set-cookie') ?? '';
+  const json = await res.json();
+  return { json, setCookie };
+}
+
+function pickSessionCookie(setCookieHeader) {
+  return setCookieHeader ? setCookieHeader.split(';')[0] : '';
+}
+
+function parseCsv(path) {
+  const text = fs.readFileSync(path, 'utf8');
+  const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
+  const rows = [];
+  for (const l of lines) {
+    const cols = l.split(';').map(s => s.trim());
+    if (cols.length < 10) {
+      console.warn('Linha ignorada (colunas insuficientes):', l);
+      continue;
+    }
+    const [
+      slug, parentId,
+      pt_name, pt_desc,
+      en_name, en_desc,
+      es_name, es_desc,
+      fr_name, fr_desc,
+    ] = cols;
+
+    rows.push({
+      slug,
+      parentId,
+      pt_name, pt_desc,
+      en_name, en_desc,
+      es_name, es_desc,
+      fr_name, fr_desc,
+    });
+  }
+  return rows;
+}
+
+function buildTranslations(row) {
+  return [
+    { languageCode: 'pt_PT', name: row.pt_name, slug: row.slug, description: row.pt_desc ?? '' },
+    { languageCode: 'en_US', name: row.en_name, slug: row.slug, description: row.en_desc ?? '' },
+    { languageCode: 'es_ES', name: row.es_name, slug: row.slug, description: row.es_desc ?? '' },
+    { languageCode: 'fr_FR', name: row.fr_name, slug: row.slug, description: row.fr_desc ?? '' },
+  ];
+}
+
+/* =================== Main =================== */
+async function main() {
+  const csvPath = process.argv[2];
+  if (!csvPath) {
+    console.error('Uso: node upsert-collection-i18n.mjs <ficheiro.csv>');
+    process.exit(1);
+  }
+
+  console.log(`A autenticar em ${endpoint}`);
+  const { json: loginJson, setCookie } = await gql(LOGIN, { u: username, p: password, r: true });
+  if (loginJson?.data?.login?.__typename !== 'CurrentUser') {
+    console.error('Falha no login:', JSON.stringify(loginJson, null, 2));
+    process.exit(2);
+  }
+  const cookie = pickSessionCookie(setCookie);
+  console.log(`Login OK como ${loginJson.data.login.identifier}`);
+
+  const rows = parseCsv(csvPath);
+  for (const row of rows) {
+    const slug = row.slug;
+    process.stdout.write(`› ${slug} … `);
+
+    // 1) existe?
+    const { json: getJson } = await gql(GET_BY_SLUG, { slug }, cookie);
+    const existing = getJson?.data?.collections?.items?.[0];
+
+    if (!existing) {
+      const input = {
+        parentId: row.parentId,
+        inheritFilters: true,
+        filters: [],
+        translations: buildTranslations(row),
+      };
+      const { json: createJson } = await gql(CREATE_COLLECTION, { input }, cookie);
+      const resp = createJson?.data?.createCollection;
+      if (resp?.id) {
+        console.log(`criada (id=${resp.id})`);
+      } else {
+        console.log('erro: Falha a criar:', JSON.stringify(createJson, null, 2));
+      }
+    } else {
+      const input = {
+        id: existing.id,
+        translations: buildTranslations(row),
+      };
+      const { json: updJson } = await gql(UPDATE_COLLECTION, { input }, cookie);
+      const resp = updJson?.data?.updateCollection;
+      if (resp?.id) {
+        console.log(`atualizada (id=${resp.id})`);
+      } else {
+        console.log('erro: Falha a atualizar:', JSON.stringify(updJson, null, 2));
+      }
+    }
+  }
+}
+
+main().catch(err => {
+  console.error('Erro inesperado:', err);
+  process.exit(99);
+});
