@@ -7,3 +7,10 @@ static/assets/
 static/email/test-emails/
 pm2-*.log
 *.tar.gz
+cookie-local.jar
+*.log
+.env
+*.csv
+node_modules/
+npm-debug.log*
+pnpm-lock.yaml
