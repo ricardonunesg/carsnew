@@ -16,7 +16,7 @@ import 'dotenv/config';
 import path from 'path';
 
 const IS_DEV = process.env.APP_ENV === 'dev';
-const serverPort = +process.env.PORT || 3000;
+const serverPort = +(process.env.PORT || 3000);
 
 export const config: VendureConfig = {
   apiOptions: {
@@ -24,7 +24,7 @@ export const config: VendureConfig = {
     adminApiPath: 'admin-api',
     shopApiPath: 'shop-api',
     hostname: '0.0.0.0',
-trustProxy: 1,
+    trustProxy: 1,
   },
 
   authOptions: {
@@ -36,10 +36,14 @@ trustProxy: 1,
   },
 
   dbConnectionOptions: {
-    type: 'sqlite',
-    synchronize: true,
+    type: 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: +(process.env.DB_PORT || 5432),
+    username: process.env.DB_USERNAME || 'vendure_user',
+    password: process.env.DB_PASSWORD || 'cars123',
+    database: process.env.DB_NAME || 'vendure',
+    synchronize: IS_DEV, // em dev true, em prod ideal é false + migrations
     logging: false,
-    database: path.join(__dirname, '../vendure.sqlite'),
   },
 
   paymentOptions: {
@@ -55,7 +59,6 @@ trustProxy: 1,
     DefaultJobQueuePlugin,
     DefaultSchedulerPlugin,
 
-    // 🔍 Elasticsearch como motor de busca
     ElasticsearchPlugin.init({
       indexPrefix: 'carsandvibes',
       clientOptions: {
@@ -63,21 +66,19 @@ trustProxy: 1,
       },
     }),
 
-    // 📧 Email em modo de desenvolvimento
     EmailPlugin.init({
       devMode: true,
       route: 'mailbox',
       outputPath: path.join(__dirname, '../static/email/test-emails'),
       handlers: defaultEmailHandlers,
       templateLoader: new FileBasedTemplateLoader(
-        path.join(__dirname, '../static/email/templates')
+        path.join(__dirname, '../static/email/templates'),
       ),
     }),
 
-    // 🧭 Admin UI
-AdminUiPlugin.init({
-  route: 'admin',
-  port: serverPort, // usa o mesmo servidor da API
-}),
+    AdminUiPlugin.init({
+      route: 'admin',
+      port: serverPort,
+    }),
   ],
 };

@@ -1,16 +1,27 @@
+# dependencies
 node_modules/
+npm-debug.log
+yarn-error.log
+
+# build output
 dist/
-.vscode/
+build/
+
+# environment
 .env
+
+# sqlite (não usas mais, mas fica aqui caso exista)
 vendure.sqlite
+
+# logs
+*.log
+pm2.log
+pm2-out.log
+pm2-error.log
+
+# assets gerados
 static/assets/
 static/email/test-emails/
-pm2-*.log
-*.tar.gz
-cookie-local.jar
-*.log
-.env
-*.csv
-node_modules/
-npm-debug.log*
-pnpm-lock.yaml
+
+# uploads
+uploads/
