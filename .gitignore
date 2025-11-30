@@ -1,27 +1,24 @@
-# dependencies
-node_modules/
-npm-debug.log
-yarn-error.log
+# Saída de Build
+/dist/
+/build/
 
-# build output
-dist/
-build/
+# Dependências
+/node_modules/
 
-# environment
+# Ambientes / Logs
 .env
-
-# sqlite (não usas mais, mas fica aqui caso exista)
-vendure.sqlite
-
-# logs
 *.log
 pm2.log
 pm2-out.log
 pm2-error.log
 
-# assets gerados
-static/assets/
-static/email/test-emails/
+# IMAGENS / ASSETS ENVIADOS PELO ADMIN
+/static/assets/
+/uploads/
+/vendure.sqlite
+/vendure.*.sqlite
 
-# uploads
-uploads/
+# FICHEIROS GRANDES DE IMPORTAÇÃO (Provavelmente o teu problema)
+importers/omp/*.zip
+importers/omp/*.xlsx
+importers/omp/*.json
