@@ -1,0 +1,320 @@
+// /root/carsandvibes/importers/omp/attach-variant-images.mjs
+// Usa:
+//  - omp-products.json         (para saber os SKUs reais das variants)
+//  - variant-image-map.json    (baseSku-colorCode -> [paths de imagem])
+//  - assets já existentes no Product (criados pelo attach-images.mjs)
+//
+// Para cada combinação Produto+Cor:
+//   - encontra todas as variants (todos os tamanhos) dessa cor
+//   - encontra os assets do produto cujos nomes batem certo com os ficheiros
+//   - chama assignAssetsToProductVariant para ligar as imagens só a essas variants
+//
+// Uso:
+//   node importers/omp/attach-variant-images.mjs        # DRY-RUN
+//   node importers/omp/attach-variant-images.mjs --apply
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const ADMIN_API_URL =
+  process.env.ADMIN_API_URL || 'http://127.0.0.1:3000/admin-api';
+const MODE = process.argv.includes('--apply') ? 'APPLY' : 'DRY-RUN';
+const APPLY = MODE === 'APPLY';
+
+console.log(`Endpoint: ${ADMIN_API_URL}`);
+console.log(
+  `Cookie:   ${
+    process.env.COOKIE_HEADER
+      ? '(HEADER env)'
+      : '/root/carsandvibes/cookie-plain.jar'
+  } (${MODE})`,
+);
+
+// Ficheiros locais
+const PRODUCTS_JSON = path.join(__dirname, 'omp-products.json');
+const VARIANT_IMAGE_MAP_PATH = path.join(__dirname, 'variant-image-map.json');
+
+// ---------- COOKIE ----------
+function cookieHeaderFromJar(jarPath) {
+  if (process.env.COOKIE_HEADER) return process.env.COOKIE_HEADER;
+
+  if (!fs.existsSync(jarPath)) {
+    throw new Error(`Cookie jar não encontrado: ${jarPath}`);
+  }
+  const text = fs.readFileSync(jarPath, 'utf8');
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+
+  const cookies = [];
+  for (let line of lines) {
+    if (line.startsWith('#HttpOnly_')) {
+      line = line.replace(/^#HttpOnly_/, '');
+    } else if (line.startsWith('#')) {
+      continue;
+    }
+    const f = line.split(/\s+/);
+    if (f.length >= 7) cookies.push({ name: f[5], value: f[6] });
+  }
+
+  if (!cookies.length) {
+    throw new Error(
+      'Cookie jar vazio – faz login outra vez com curl -c cookie-plain.jar ...',
+    );
+  }
+
+  return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+}
+
+const COOKIE_HEADER = cookieHeaderFromJar(
+  process.env.COOKIE_JAR || '/root/carsandvibes/cookie-plain.jar',
+);
+
+// ---------- GQL ----------
+async function gql(query, variables = {}) {
+  const res = await fetch(ADMIN_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: COOKIE_HEADER,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const json = await res.json();
+  if (json.errors && json.errors.length) {
+    const err = new Error('GraphQL error');
+    err.graphQLErrors = json.errors;
+    throw err;
+  }
+  return json.data;
+}
+
+// Query para buscar produto + assets
+async function getProductBySlug(slug) {
+  const data = await gql(
+    `
+    query GetProductBySlug($slug: String!) {
+      products(options: { filter: { slug: { eq: $slug } } }) {
+        items {
+          id
+          slug
+          assets { id name }
+          featuredAsset { id name }
+        }
+      }
+    }
+  `,
+    { slug },
+  );
+  return data.products.items[0] || null;
+}
+
+// Query para ir buscar uma variant pelo SKU real
+async function getVariantBySku(sku) {
+  const data = await gql(
+    `
+    query GetVariantBySku($sku: String!) {
+      productVariants(options: { filter: { sku: { eq: $sku } } }) {
+        items {
+          id
+          sku
+          assets { id }
+          featuredAsset { id }
+          product { id slug }
+        }
+      }
+    }
+  `,
+    { sku },
+  );
+  return data.productVariants.items[0] || null;
+}
+
+// Mutation para ligar assets a uma variant
+async function assignAssetsToVariant(variantId, assetIds) {
+  if (!assetIds.length) return null;
+
+  const data = await gql(
+    `
+    mutation AssignAssetsToVariant(
+      $variantId: ID!
+      $assetIds: [ID!]!
+      $featuredId: ID
+    ) {
+      assignAssetsToProductVariant(
+        variantId: $variantId
+        assetIds: $assetIds
+        featuredAssetId: $featuredId
+      ) {
+        id
+        assets { id }
+        featuredAsset { id }
+      }
+    }
+  `,
+    {
+      variantId,
+      assetIds,
+      featuredId: assetIds[0],
+    },
+  );
+
+  return data.assignAssetsToProductVariant;
+}
+
+// ---------- MAIN ----------
+async function main() {
+  if (!fs.existsSync(PRODUCTS_JSON)) {
+    console.error('❌ Não encontrei omp-products.json.');
+    process.exit(1);
+  }
+  if (!fs.existsSync(VARIANT_IMAGE_MAP_PATH)) {
+    console.error(
+      '❌ Não encontrei variant-image-map.json. Corre primeiro build-variant-image-map.mjs',
+    );
+    process.exit(1);
+  }
+
+  const productsRaw = JSON.parse(fs.readFileSync(PRODUCTS_JSON, 'utf8'));
+  const variantImageMap = JSON.parse(
+    fs.readFileSync(VARIANT_IMAGE_MAP_PATH, 'utf8'),
+  );
+
+  // Construir mapa: (baseSku-colorCode) -> [sku1, sku2, ...]
+  const colorKeyToSkus = {};
+  for (const row of productsRaw) {
+    const { baseSku, colorCode, sku } = row;
+    if (!baseSku || !colorCode || !sku) continue;
+    const key = `${baseSku}-${colorCode}`;
+    if (!colorKeyToSkus[key]) colorKeyToSkus[key] = [];
+    if (!colorKeyToSkus[key].includes(sku)) colorKeyToSkus[key].push(sku);
+  }
+
+  const colorKeys = Object.keys(variantImageMap);
+  console.log(`Variants (cor) com imagens definidas: ${colorKeys.length}`);
+
+  let totalVariantsUpdated = 0;
+
+  for (const colorKey of colorKeys) {
+    const relPaths = variantImageMap[colorKey] || [];
+
+    console.log('\n==============================');
+    console.log(`Combinação Produto+Cor: ${colorKey}`);
+
+    if (!relPaths.length) {
+      console.log('  [INFO] Sem imagens para esta cor, a ignorar.');
+      continue;
+    }
+
+    const skuList = colorKeyToSkus[colorKey] || [];
+    if (!skuList.length) {
+      console.warn(
+        `  [WARN] Nenhuma variant (SKU) encontrada em omp-products.json para ${colorKey}`,
+      );
+      continue;
+    }
+
+    // Separar baseSku e colorCode (baseSku pode ter vários "-")
+    const parts = colorKey.split('-');
+    const colorCode = parts[parts.length - 1];
+    const baseSku = parts.slice(0, parts.length - 1).join('-');
+    const slug = baseSku.toLowerCase();
+
+    // Ir buscar produto para mapear filenames -> assetIds
+    const product = await getProductBySlug(slug);
+    if (!product) {
+      console.warn(
+        `  [WARN] Produto com slug="${slug}" não encontrado no Vendure.`,
+      );
+      continue;
+    }
+
+    const assetByName = {};
+    for (const a of product.assets || []) {
+      if (a.name) assetByName[a.name.toLowerCase()] = a.id;
+    }
+
+    const assetIds = [];
+    for (const rel of relPaths) {
+      const filename = path.basename(rel).toLowerCase();
+      const id = assetByName[filename];
+      if (!id) {
+        console.warn(
+          `  [WARN] Asset com filename="${filename}" não encontrado no produto ${slug}.`,
+        );
+        continue;
+      }
+      assetIds.push(id);
+    }
+
+    if (!assetIds.length) {
+      console.log(
+        '  [INFO] Nenhum assetId correspondente encontrado no produto, a ignorar cor.',
+      );
+      continue;
+    }
+
+    console.log(
+      `  → AssetIds para esta cor (${colorCode}): ${assetIds.join(', ')}`,
+    );
+    console.log(
+      `  → Variants (SKUs) desta cor: ${skuList.join(', ')}`,
+    );
+
+    for (const sku of skuList) {
+      console.log(`\n  === Variant SKU=${sku} ===`);
+
+      const variant = await getVariantBySku(sku);
+      if (!variant) {
+        console.warn(
+          `    ⚠️ Variant com sku="${sku}" não encontrada no Vendure.`,
+        );
+        continue;
+      }
+
+      console.log(
+        `    → Variant encontrada id=${variant.id}, produto=${variant.product.slug}, assets atuais: ${
+          variant.assets?.length || 0
+        }`,
+      );
+
+      if (!APPLY) {
+        console.log(
+          '    [DRY-RUN] Não vou alterar esta variant (faltou --apply).',
+        );
+        continue;
+      }
+
+      try {
+        const updated = await assignAssetsToVariant(variant.id, assetIds);
+        if (updated) {
+          console.log(
+            `    ✅ Variant atualizada com ${updated.assets.length} assets, featuredAssetId=${updated.featuredAsset?.id}`,
+          );
+          totalVariantsUpdated++;
+        }
+      } catch (e) {
+        console.error(
+          '    ❌ Erro ao atribuir assets à variant:',
+          e.graphQLErrors || e,
+        );
+      }
+    }
+  }
+
+  console.log('\n=== RESUMO ===');
+  console.log(`Modo: ${MODE}`);
+  console.log(
+    APPLY
+      ? `Variants atualizadas: ${totalVariantsUpdated}`
+      : '(DRY-RUN, nada alterado)',
+  );
+}
+
+main().catch(err => {
+  console.error('❌ Erro geral:', err);
+  process.exit(1);
+});

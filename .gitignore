@@ -1,0 +1,24 @@
+# Saída de Build
+/dist/
+/build/
+
+# Dependências
+/node_modules/
+
+# Ambientes / Logs
+.env
+*.log
+pm2.log
+pm2-out.log
+pm2-error.log
+
+# IMAGENS / ASSETS ENVIADOS PELO ADMIN
+/static/assets/
+/uploads/
+/vendure.sqlite
+/vendure.*.sqlite
+
+# FICHEIROS GRANDES DE IMPORTAÇÃO (Provavelmente o teu problema)
+importers/omp/*.zip
+importers/omp/*.xlsx
+importers/omp/*.json
