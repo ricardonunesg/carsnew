@@ -8,3 +8,4 @@ export const vendure = new GraphQLClient(shopApiUrl, {
     "Content-Type": "application/json",
   },
 });
+

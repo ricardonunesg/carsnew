@@ -22,3 +22,6 @@ pm2-error.log
 importers/omp/*.zip
 importers/omp/*.xlsx
 importers/omp/*.json
+
+# Env files
+remix-storefront/.env
