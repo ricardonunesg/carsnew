@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import { Link } from "react-router";
+import type { CSSProperties } from "react";
 
 type Blok = {
   _uid: string;
@@ -9,6 +8,55 @@ type Blok = {
 
 export function StoryblokComponent({ blok }: { blok: Blok }) {
   switch (blok.component) {
+    /**************************************
+     * 👉 BACKGROUND BLOCK
+     **************************************/
+    case "page_background": {
+      const style: CSSProperties = {
+        backgroundImage: blok.background_image?.filename
+          ? `url(${blok.background_image.filename})`
+          : undefined,
+        backgroundColor: blok.background_color || undefined,
+        backgroundSize: blok.background_size || "cover",
+        backgroundPosition: blok.background_position || "center",
+        backgroundRepeat: "no-repeat",
+        width: "100%",
+        minHeight: "100vh",
+      };
+
+      return (
+        <section style={style}>
+          {Array.isArray(blok.body) &&
+            blok.body.map((nestedBlok: Blok) => (
+              <StoryblokComponent key={nestedBlok._uid} blok={nestedBlok} />
+            ))}
+        </section>
+      );
+    }
+
+    /**************************************
+     * 👉 IMAGE BLOCK
+     **************************************/
+    case "image_block": {
+      const imgStyle: CSSProperties = {
+        width: "100%",
+        maxHeight: "520px", // ajusta aqui se quiseres menor/maior
+        objectFit: "cover",
+        display: "block",
+      };
+
+      return (
+        <div className="w-full overflow-hidden">
+          {blok.image?.filename && (
+            <img src={blok.image.filename} alt={blok.alt || ""} style={imgStyle} />
+          )}
+        </div>
+      );
+    }
+
+    /**************************************
+     * 👉 TEASER
+     **************************************/
     case "teaser":
       return (
         <section className="border-b border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-black">
@@ -28,6 +76,9 @@ export function StoryblokComponent({ blok }: { blok: Blok }) {
         </section>
       );
 
+    /**************************************
+     * 👉 GRID
+     **************************************/
     case "grid":
       return (
         <section className="mx-auto max-w-6xl px-4 py-10 md:px-6 lg:px-8">
@@ -42,6 +93,9 @@ export function StoryblokComponent({ blok }: { blok: Blok }) {
         </section>
       );
 
+    /**************************************
+     * 👉 FEATURE
+     **************************************/
     case "feature":
       return (
         <article className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
@@ -54,11 +108,17 @@ export function StoryblokComponent({ blok }: { blok: Blok }) {
         </article>
       );
 
+    /**************************************
+     * 👉 DEFAULT
+     **************************************/
     default:
       return null;
   }
 }
 
+/**************************************
+ * 👉 BODY WRAPPER
+ **************************************/
 export function StoryblokBody({ body }: { body: Blok[] }) {
   if (!body || !Array.isArray(body)) return null;
   return (
@@ -69,5 +129,8 @@ export function StoryblokBody({ body }: { body: Blok[] }) {
     </>
   );
 }
-// Exporta os componentes individuais que não estão no switch case, como o Page.
-export { default as Page } from './page';
+
+/**************************************
+ * 👉 EXPORTA O COMPONENTE PAGE
+ **************************************/
+export { default as Page } from "./page";
