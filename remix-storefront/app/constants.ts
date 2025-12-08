@@ -1,21 +1,21 @@
-export const APP_META_TITLE = 'Cars & Vibes — Performance Parts & Lifestyle';
-export const APP_META_DESCRIPTION = 'Loja oficial Cars & Vibes: performance, lifestyle e equipamento piloto.';
-  'A headless commerce storefront starter kit built with Remix & Vendure';
-export const DEMO_API_URL = 'https://readonlydemo.vendure.io/shop-api';
-export let API_URL =
-  typeof process !== 'undefined'
-    ? process.env.VENDURE_API_URL ?? DEMO_API_URL
-    : DEMO_API_URL;
+// app/constants.ts
 
-/**
- * This function is used when running in Cloudflare Pages in order to set the API URL
- * based on an environment variable. Env vars work differently in CF Pages and are not available
- * on the `process` object (which does not exist). Instead, it needs to be accessed from the loader
- * context, and if defined we use it here to set the API_URL var which will be used by the
- * GraphQL calls.
- *
- * See https://developers.cloudflare.com/workers/platform/environment-variables/#environmental-variables-with-module-workers
- */
-export function setApiUrl(apiUrl: string) {
-  API_URL = apiUrl;
-}
+// Metadados da loja
+export const APP_META_TITLE =
+  'Cars & Vibes — Performance Parts & Lifestyle';
+export const APP_META_DESCRIPTION =
+  'Loja oficial Cars & Vibes: performance, lifestyle e equipamento piloto.';
+
+// URL base por defeito para a API do Vendure (teu backend, NÃO o demo)
+export const DEFAULT_API_URL = 'https://carsandvibes.duckdns.org/shop-api';
+
+// Mantemos o nome DEMO_API_URL por compatibilidade, mas agora já é o teu servidor
+export const DEMO_API_URL = DEFAULT_API_URL;
+
+// URL que o resto da app usa para chamar o backend
+// Se existir VENDURE_API_URL no ambiente, usa essa.
+// Caso contrário, usa sempre o teu backend, NUNCA o demo.
+export const API_URL =
+  typeof process !== 'undefined' && process.env.VENDURE_API_URL
+    ? process.env.VENDURE_API_URL
+    : DEFAULT_API_URL;
