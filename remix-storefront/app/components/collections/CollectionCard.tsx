@@ -1,29 +1,35 @@
 import { Link } from '@remix-run/react';
-import { CollectionsQuery } from '~/generated/graphql';
+import type { Collection } from '~/generated/graphql';
 
-export function CollectionCard({
-  collection,
-}: {
-  collection: CollectionsQuery['collections']['items'][number];
-}) {
+type CollectionCardProps = {
+  collection: Pick<Collection, 'id' | 'name' | 'slug'> & {
+    featuredAsset?: { preview?: string | null } | null;
+  };
+};
+
+/**
+ * Cartão de coleção sem dependência de imagem.
+ * Usa o mesmo “estilo pill” das categorias da home: fundo escuro, borda vermelha, seta →.
+ */
+export function CollectionCard({ collection }: CollectionCardProps) {
   return (
     <Link
-      to={'/collections/' + collection.slug}
-      prefetch="intent"
-      key={collection.id}
-      className="max-w-[300px] relative rounded-lg overflow-hidden hover:opacity-75 xl:w-auto"
+      to={`/collections/${collection.slug}`}
+      className="
+        inline-flex w-full items-center justify-between
+        rounded-lg border border-red-600
+        bg-black text-white
+        px-4 py-2 text-sm sm:text-base
+        hover:bg-red-600 hover:border-red-600
+        transition-colors duration-150
+      "
     >
-      <span aria-hidden="true" className="">
-        <div className="w-full h-full object-center object-cover">
-          <img src={collection.featuredAsset?.preview + '?w=300&h=300'} />
-        </div>
-      </span>
+      <span className="truncate">{collection.name}</span>
       <span
         aria-hidden="true"
-        className="absolute w-full bottom-x-0 bottom-0 h-2/3 bg-gradient-to-t from-gray-800 opacity-50"
-      />
-      <span className="absolute w-full bottom-2 mt-auto text-center text-xl font-bold text-white">
-        {collection.name}
+        className="ml-3 text-base sm:text-lg leading-none"
+      >
+        →
       </span>
     </Link>
   );

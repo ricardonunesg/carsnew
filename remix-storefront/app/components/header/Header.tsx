@@ -19,49 +19,26 @@ export function Header({
   const isScrollingUp = useScrollingUp();
   const { t } = useTranslation();
 
+// app/components/header/Header.tsx
+
   return (
     <header
       className={classNames(
-        isScrollingUp ? 'sticky top-0 z-10 animate-dropIn' : '',
-        'bg-gradient-to-r from-zinc-700 to-gray-900 shadow-lg transform shadow-xl',
+        // header fica sempre sticky e com z-index alto
+        'sticky top-0 z-50 bg-gradient-to-r from-zinc-700 to-gray-900 shadow-lg transform shadow-xl',
+        isScrollingUp ? 'animate-dropIn' : '',
       )}
     >
-      <div className="bg-zinc-100 text-gray-600 shadow-inner text-center text-sm py-2 px-2 xl:px-0">
-        <div className="max-w-6xl mx-2 md:mx-auto flex items-center justify-between">
-          <div>
-            <p className="hidden sm:block">
-              {t('vendure.exclusive')}{' '}
-              <a
-                href="https://github.com/vendure-ecommerce/storefront-remix-starter"
-                target="_blank"
-                className="underline"
-              >
-                {t('vendure.repoLinkLabel')}
-              </a>
-            </p>
-          </div>
-          <div>
-            <Link
-              to={isSignedIn ? '/account' : '/sign-in'}
-              className="flex space-x-1"
-            >
-              <UserIcon className="w-4 h-4"></UserIcon>
-              <span>
-                {isSignedIn ? t('account.myAccount') : t('account.signIn')}
-              </span>
-            </Link>
-          </div>
-        </div>
-      </div>
       <div className="max-w-6xl mx-auto p-4 flex items-center space-x-4">
         <h1 className="text-white w-10">
           <Link to="/">
-            <img
-              src="/cube-logo-small.webp"
-              width={40}
-              height={31}
-              alt={t('commmon.logoAlt')}
-            />
+<img
+  src="/logocars.png"
+  width={50}
+  height={50}
+  className="object-contain"
+  alt="Cars and Vibes Logo"
+/>
           </Link>
         </h1>
         <div className="flex space-x-4 hidden sm:block">

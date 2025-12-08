@@ -3,6 +3,7 @@ import {
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
   VendureConfig,
+  facetValueCollectionFilter, // 👈 ADICIONADO
 } from '@vendure/core';
 import { ElasticsearchPlugin } from '@vendure/elasticsearch-plugin';
 import {
@@ -25,6 +26,22 @@ export const config: VendureConfig = {
     shopApiPath: 'shop-api',
     hostname: '0.0.0.0',
     trustProxy: 1,
+
+    // 🔥 ATIVAR PLAYGROUND + DEBUG (Admin & Shop)
+    adminApiPlayground: {
+      settings: {
+        'request.credentials': 'include',
+        'editor.theme': 'dark',
+      },
+    },
+    adminApiDebug: true,
+    shopApiPlayground: {
+      settings: {
+        'request.credentials': 'include',
+        'editor.theme': 'dark',
+      },
+    },
+    shopApiDebug: true,
   },
 
   authOptions: {
@@ -48,6 +65,11 @@ export const config: VendureConfig = {
 
   paymentOptions: {
     paymentMethodHandlers: [dummyPaymentHandler],
+  },
+
+  // 👇 AQUI REGISTAMOS O FILTRO DE COLLECTIONS
+  catalogOptions: {
+    collectionFilters: [facetValueCollectionFilter],
   },
 
   plugins: [

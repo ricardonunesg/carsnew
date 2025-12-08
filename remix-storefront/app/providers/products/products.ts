@@ -71,6 +71,7 @@ gql`
       ...DetailedProduct
     }
   }
+  ${detailedProductFragment}
 `;
 
 export const listedProductFragment = gql`
@@ -79,6 +80,10 @@ export const listedProductFragment = gql`
     productName
     slug
     productAsset {
+      id
+      preview
+    }
+    productVariantAsset {
       id
       preview
     }

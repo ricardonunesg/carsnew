@@ -1,9 +1,11 @@
+// app/routes/collections.$slug.tsx
 import { MetaFunction, useLoaderData, useSubmit } from '@remix-run/react';
 import { DataFunctionArgs } from '@remix-run/server-runtime';
 import { withZod } from '@remix-validated-form/with-zod';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ValidatedForm } from 'remix-validated-form';
+
 import { Breadcrumbs } from '~/components/Breadcrumbs';
 import { CollectionCard } from '~/components/collections/CollectionCard';
 import { FacetFilterTracker } from '~/components/facet-filter/facet-filter-tracker';
@@ -29,12 +31,21 @@ const allowedPaginationLimits = new Set<number>([
   50,
   100,
 ]);
+
 const { validator, filteredSearchLoader } = filteredSearchLoaderFromPagination(
   allowedPaginationLimits,
   paginationLimitMinimumDefault,
 );
 
 export async function loader({ params, request, context }: DataFunctionArgs) {
+  // 1) carregar a coleção pelo slug
+  const { collection } = await sdk.collection({ slug: params.slug as string });
+
+  if (!collection?.id || !collection?.name) {
+    throw new Response('Not Found', { status: 404 });
+  }
+
+  // 2) fazer o search normal com o slug da coleção
   const {
     result,
     resultWithoutFacetValueFilters,
@@ -47,13 +58,6 @@ export async function loader({ params, request, context }: DataFunctionArgs) {
     request,
     context,
   });
-
-  const collection = (await sdk.collection({ slug: params.slug })).collection;
-  if (!collection?.id || !collection?.name) {
-    throw new Response('Not Found', {
-      status: 404,
-    });
-  }
 
   return {
     term,
@@ -68,12 +72,10 @@ export async function loader({ params, request, context }: DataFunctionArgs) {
 
 export default function CollectionSlug() {
   const loaderData = useLoaderData<typeof loader>();
-  const {
-    collection,
-    result,
-    resultWithoutFacetValueFilters,
-    facetValueIds,
-  } = loaderData;
+  const { collection, result, resultWithoutFacetValueFilters, facetValueIds } =
+    loaderData;
+
+  const hasChildren = !!collection.children && collection.children.length > 0;
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const facetValuesTracker = useRef(new FacetFilterTracker());
@@ -82,17 +84,9 @@ export default function CollectionSlug() {
     resultWithoutFacetValueFilters,
     facetValueIds,
   );
+
   const submit = useSubmit();
   const { t } = useTranslation();
-
-  // 🔧 Só mostramos children que tenham imagem (featuredAsset),
-  // para evitar ícones partidos e coleções “mortas”.
-  const childrenWithImage =
-    collection.children?.filter(
-      (child: any) => child?.featuredAsset?.preview,
-    ) ?? [];
-
-  const hasVisibleChildren = childrenWithImage.length > 0;
 
   return (
     <div className="max-w-6xl mx-auto px-4">
@@ -101,39 +95,50 @@ export default function CollectionSlug() {
           {collection.name}
         </h2>
 
-        <FiltersButton
-          filterCount={facetValueIds.length}
-          onClick={() => setMobileFiltersOpen(true)}
-        />
+        {/* Só mostra o botão de filtros se estivermos numa coleção folha
+            (subcategoria com produtos) */}
+        {!hasChildren && (
+          <FiltersButton
+            filterCount={facetValueIds.length}
+            onClick={() => setMobileFiltersOpen(true)}
+          />
+        )}
       </div>
 
       <Breadcrumbs items={collection.breadcrumbs} />
 
-      {hasVisibleChildren && (
-        <div className="max-w-2xl mx-auto py-16 sm:py-16 lg:max-w-none border-b mb-16">
+      {/* Se a coleção tiver filhos → mostrar só as subcategorias (botões/cartões) */}
+      {hasChildren && (
+        <div className="max-w-2xl mx-auto py-16 sm:py-16 lg:max-w-none">
           <h2 className="text-2xl font-light text-gray-900">
             {t('product.collections')}
           </h2>
+
           <div className="mt-6 grid max-w-xs sm:max-w-none mx-auto sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-            {childrenWithImage.map((child) => (
+            {collection.children!.map((child) => (
               <CollectionCard key={child.id} collection={child} />
             ))}
           </div>
         </div>
       )}
 
-      <ValidatedForm
-        validator={withZod(validator)}
-        method="get"
-        onChange={(e) => submit(e.currentTarget, { preventScrollReset: true })}
-      >
-        <FilterableProductGrid
-          allowedPaginationLimits={allowedPaginationLimits}
-          mobileFiltersOpen={mobileFiltersOpen}
-          setMobileFiltersOpen={setMobileFiltersOpen}
-          {...loaderData}
-        />
-      </ValidatedForm>
+      {/* Se NÃO tiver filhos → é subcategoria. Aqui mostramos a grelha de produtos */}
+      {!hasChildren && (
+        <ValidatedForm
+          validator={withZod(validator)}
+          method="get"
+          onChange={(e) =>
+            submit(e.currentTarget, { preventScrollReset: true })
+          }
+        >
+          <FilterableProductGrid
+            allowedPaginationLimits={allowedPaginationLimits}
+            mobileFiltersOpen={mobileFiltersOpen}
+            setMobileFiltersOpen={setMobileFiltersOpen}
+            {...loaderData}
+          />
+        </ValidatedForm>
+      )}
     </div>
   );
 }

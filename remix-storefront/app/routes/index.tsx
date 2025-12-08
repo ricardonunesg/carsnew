@@ -1,8 +1,6 @@
-import { useLoaderData } from '@remix-run/react';
+import { Link, useLoaderData } from '@remix-run/react';
 import { getCollections } from '~/providers/collections/collections';
-import { CollectionCard } from '~/components/collections/CollectionCard';
-import { BookOpenIcon } from '@heroicons/react/24/solid';
-import { LoaderArgs } from '@remix-run/server-runtime';
+import type { LoaderArgs } from '@remix-run/server-runtime';
 import { useTranslation } from 'react-i18next';
 
 export async function loader({ request }: LoaderArgs) {
@@ -15,95 +13,77 @@ export async function loader({ request }: LoaderArgs) {
 export default function Index() {
   const { collections } = useLoaderData<typeof loader>();
   const { t } = useTranslation();
-  const headerImage = collections[0]?.featuredAsset?.preview;
 
   return (
     <>
-      <div className="relative">
-        {/* Decorative image and overlay */}
-        <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
-          {headerImage && (
-            <img
-              className="absolute inset-0 w-full"
-              src={headerImage + '?w=800'}
-              alt="header"
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-400 to-black mix-blend-darken" />
-        </div>
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gray-900 opacity-50"
+      {/* HERO CARS & VIBES */}
+      <section className="relative w-full h-[500px] sm:h-[560px] overflow-hidden">
+        <img
+          src="/carsandvibes-hero.jpg"
+          alt="Cars & Vibes"
+          className="absolute top-0 left-0 w-full h-full object-cover"
         />
-        <div className="relative max-w-3xl mx-auto py-32 px-6 flex flex-col items-center text-center sm:py-64 lg:px-0">
-          <div className="relative bg-zinc-800 bg-opacity-0 rounded-lg p-0">
-            <h1 className="text-6xl text-transparent bg-clip-text font-extrabold tracking-normal lg:text-6xl bg-gradient-to-r from-yellow-600 via-red-500 to-blue-600">
-              {t('vendure.title')}
-            </h1>
-          </div>
 
-          <p className="mt-4 text-2xl text-white">
-            {t('vendure.intro')}{' '}
-            <a
-              href="https://www.vendure.io"
-              className="text-blue-300 hover:text-blue-500"
-            >
-              Vendure
-            </a>{' '}
-            &{' '}
-            <a
-              href="~/routes/__cart/index"
-              className="text-red-300 hover:text-red-500"
-            >
-              Remix
-            </a>
+        {/* Overlay escuro por cima da imagem */}
+        <div className="absolute inset-0 bg-black/45" />
+
+        {/* Conteúdo do hero */}
+        <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+          <h1 className="text-4xl sm:text-6xl font-extrabold text-white drop-shadow-lg">
+            Cars &amp; Vibes
+          </h1>
+          <p className="mt-4 text-lg sm:text-2xl text-gray-200 max-w-2xl drop-shadow">
+            Performance, estilo e qualidade — a tua loja de peças e acessórios
+            automóvel.
           </p>
-          <p className="mt-4 text-gray-300 space-x-1">
-            <BookOpenIcon className="w-5 h-5 inline" />
-            <span>{t('common.readMore')}</span>
-            <a
-              className="text-primary-200 hover:text-primary-400"
-              href="https://www.vendure.io/blog/2022/05/lightning-fast-headless-commerce-with-vendure-and-remix"
-            >
-              {t('vendure.link')}
-            </a>
-          </p>
+          <a
+            href="/collections/pilote"
+            className="mt-8 inline-flex items-center rounded-lg bg-primary-600 px-6 py-3 text-lg font-semibold text-white shadow-lg hover:bg-primary-700"
+          >
+            Explorar produtos
+          </a>
         </div>
-      </div>
+      </section>
 
+      {/* LISTA DE CATEGORIAS – estilo “chips” vermelhos */}
       <section
         aria-labelledby="category-heading"
-        className="pt-24 sm:pt-32 xl:max-w-7xl xl:mx-auto xl:px-8"
+        className="py-16 bg-white"
       >
-        <div className="px-4 sm:px-6 lg:px-8 xl:px-0">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <h2
             id="category-heading"
-            className="text-2xl font-light tracking-tight text-gray-900"
+            className="text-2xl font-semibold tracking-tight text-gray-900 mb-6"
           >
             {t('common.shopByCategory')}
           </h2>
-        </div>
 
-        <div className="mt-4 flow-root">
-          <div className="-my-2">
-            <div className="box-content py-2 px-2 relative overflow-x-auto xl:overflow-visible">
-              <div className="grid justify-items-center grid-cols-2 md:grid-cols-3 gap-y-8 gap-x-8 sm:px-6 lg:px-8 xl:relative xl:px-0 xl:space-x-0 xl:gap-x-8">
-                {collections.map((collection) => (
-                  <CollectionCard key={collection.id} collection={collection} />
-                ))}
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            {collections.map((collection) => (
+              <Link
+                key={collection.id}
+                to={`/collections/${collection.slug}`}
+                prefetch="intent"
+                className="
+                  inline-flex items-center justify-between
+                  rounded-lg border border-red-600
+                  bg-black text-white
+                  px-4 py-3 text-sm font-medium
+                  shadow-sm
+                  hover:bg-red-600 hover:border-red-600
+                  focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white
+                  transition
+                "
+              >
+                <span className="truncate max-w-[12rem]">
+                  {collection.name}
+                </span>
+                <span className="ml-3 text-lg" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            ))}
           </div>
-        </div>
-
-        <div className="mt-6 px-4 sm:hidden">
-          <a
-            href="~/routes/__cart/index#"
-            className="block text-sm font-semibold text-primary-600 hover:text-primary-500"
-          >
-            {t('common.browseCategories')}
-            <span aria-hidden="true"> &rarr;</span>
-          </a>
         </div>
       </section>
     </>

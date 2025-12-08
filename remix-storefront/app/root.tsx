@@ -44,24 +44,14 @@ export const links: LinksFunction = () => [
 const devMode =
   typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
 
-// The root data does not change once loaded.
 export const shouldRevalidate: ShouldRevalidateFunction = ({
   nextUrl,
   currentUrl,
   formAction,
 }) => {
-  if (currentUrl.pathname === '/sign-in') {
-    // just logged in
-    return true;
-  }
-  if (currentUrl.pathname === '/account' && nextUrl.pathname === '/') {
-    // just logged out
-    return true;
-  }
-  if (formAction === '/checkout/payment') {
-    // submitted payment for order
-    return true;
-  }
+  if (currentUrl.pathname === '/sign-in') return true;
+  if (currentUrl.pathname === '/account' && nextUrl.pathname === '/') return true;
+  if (formAction === '/checkout/payment') return true;
   return false;
 };
 
@@ -72,30 +62,32 @@ export type RootLoaderData = {
   locale: string;
 };
 
-export async function loader({ request, params, context }: DataFunctionArgs) {
+export async function loader({ request }: DataFunctionArgs) {
   const collections = await getCollections(request, { take: 20 });
   const topLevelCollections = collections.filter(
     (collection) => collection.parent?.name === '__root_collection__',
   );
   const activeCustomer = await getActiveCustomer({ request });
-  const locale = await getI18NextServer().then((i18next) =>
-    i18next.getLocale(request),
-  );
-  const loaderData: RootLoaderData = {
-    activeCustomer,
-    activeChannel: await activeChannel({ request }),
-    collections: topLevelCollections,
-    locale,
-  };
 
-  return json(loaderData, { headers: activeCustomer._headers });
+  // 🔥 FORÇAR PORTUGUÊS ENQUANTO DESENVOLVES
+  const locale = 'pt';
+
+  return json(
+    {
+      activeCustomer,
+      activeChannel: await activeChannel({ request }),
+      collections: topLevelCollections,
+      locale,
+    },
+    { headers: activeCustomer._headers }
+  );
 }
 
 export default function App() {
   const [open, setOpen] = useState(false);
   const loaderData = useLoaderData<RootLoaderData>();
   const { collections } = loaderData;
-  const { locale } = useLoaderData<typeof loader>();
+  const { locale } = loaderData;
   const { i18n } = useTranslation();
   const {
     activeOrderFetcher,
@@ -108,8 +100,6 @@ export default function App() {
   useChangeLanguage(locale);
 
   useEffect(() => {
-    // When the loader has run, this implies we should refresh the contents
-    // of the activeOrder as the user may have signed in or out.
     refresh();
   }, [loaderData]);
 
@@ -118,7 +108,10 @@ export default function App() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" type="image/png"></link>
+
+        {/* CORRIGIDO ✔ */}
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+
         <Meta />
         <Links />
       </head>
@@ -127,7 +120,7 @@ export default function App() {
           onCartIconClick={() => setOpen(!open)}
           cartQuantity={activeOrder?.totalQuantity ?? 0}
         />
-        <main className="">
+        <main>
           <Outlet
             context={{
               activeOrderFetcher,
@@ -137,6 +130,7 @@ export default function App() {
             }}
           />
         </main>
+
         <CartTray
           open={open}
           onClose={setOpen}
@@ -144,9 +138,10 @@ export default function App() {
           adjustOrderLine={adjustOrderLine}
           removeItem={removeItem}
         />
+
         <ScrollRestoration />
         <Scripts />
-        <Footer collections={collections}></Footer>
+        <Footer collections={collections} />
 
         {devMode && <LiveReload />}
       </body>
@@ -154,29 +149,13 @@ export default function App() {
   );
 }
 
-type DefaultSparseErrorPageProps = {
-  tagline: string;
-  headline: string;
-  description: string;
-};
-
-/**
- * You should replace this in your actual storefront to provide a better user experience.
- * You probably want to still show your footer and navigation. You will also need fallbacks
- * for your data dependant components in case your shop instance / CMS isnt responding.
- * See: https://remix.run/docs/en/main/route/error-boundary
- */
-function DefaultSparseErrorPage({
-  tagline,
-  headline,
-  description,
-}: DefaultSparseErrorPageProps) {
+function DefaultSparseErrorPage({ tagline, headline, description }) {
   return (
     <html lang="en" id="app">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" type="image/png"></link>
+        <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <Meta />
         <Links />
       </head>
@@ -188,9 +167,7 @@ function DefaultSparseErrorPage({
           <h1 className="mt-2 font-bold text-gray-900 tracking-tight text-4xl sm:text-5xl">
             {headline}
           </h1>
-          <p className="mt-4 text-base text-gray-500 max-w-full break-words">
-            {description}
-          </p>
+          <p className="mt-4 text-base text-gray-500">{description}</p>
           <div className="mt-6">
             <Link
               to="/"
@@ -200,17 +177,16 @@ function DefaultSparseErrorPage({
             </Link>
           </div>
         </main>
+
         <ScrollRestoration />
         <Scripts />
+
         {devMode && <LiveReload />}
       </body>
     </html>
   );
 }
 
-/**
- * As mentioned in the jsdoc for `DefaultSparseErrorPage` you should replace this to suit your needs.
- */
 export function ErrorBoundary() {
   let tagline = 'Oopsy daisy';
   let headline = 'Unexpected error';
@@ -232,11 +208,7 @@ export function ErrorBoundary() {
   );
 }
 
-/**
- * In Remix v2 there will only be a `ErrorBoundary`
- * As mentioned in the jsdoc for `DefaultSparseErrorPage` you should replace this to suit your needs.
- * Relevant for the future: https://remix.run/docs/en/main/route/error-boundary-v2
- */
 export function CatchBoundary() {
   return ErrorBoundary();
 }
+

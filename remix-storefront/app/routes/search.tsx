@@ -15,6 +15,7 @@ const allowedPaginationLimits = new Set<number>([
   50,
   100,
 ]);
+
 const validator = withZod(paginationValidationSchema(allowedPaginationLimits));
 
 export const { filteredSearchLoader: loader } =
@@ -27,6 +28,7 @@ export default function Search() {
   const loaderData = useLoaderData<Awaited<typeof loader>>();
   const { result, resultWithoutFacetValueFilters, term, facetValueIds } =
     loaderData;
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const facetValuesTracker = useRef(new FacetFilterTracker());
   facetValuesTracker.current.update(
@@ -34,6 +36,7 @@ export default function Search() {
     resultWithoutFacetValueFilters,
     facetValueIds,
   );
+
   const submit = useSubmit();
   const { t } = useTranslation();
 
