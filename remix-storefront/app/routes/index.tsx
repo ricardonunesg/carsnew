@@ -3,6 +3,122 @@ import { getCollections } from '~/providers/collections/collections';
 import type { LoaderArgs } from '@remix-run/server-runtime';
 import { useTranslation } from 'react-i18next';
 
+// 🌍 idiomas suportados
+type Locale = 'pt' | 'fr' | 'en' | 'es';
+
+// Mapa: nome atual da collection (como vem do Vendure, em FR)
+//  -> labels por idioma
+const COLLECTION_LABELS: Record<
+  string,
+  Partial<Record<Locale, string>>
+> = {
+  // Équipement Mécanique
+  Pitline: {
+    pt: 'Pitline',
+    es: 'Pitline',
+    en: 'Pitline',
+  },
+  Fluids: {
+    pt: 'Fluidos',
+    es: 'Fluidos',
+    en: 'Fluids',
+  },
+  'Équipement Pilote FIA': {
+    pt: 'Equipamento Piloto FIA',
+    es: 'Equipamiento Piloto FIA',
+    en: 'FIA Driver Equipment',
+  },
+  Accessoires: {
+    pt: 'Acessórios',
+    es: 'Accesorios',
+    en: 'Accessories',
+  },
+  'Bottines FIA': {
+    pt: 'Botas FIA',
+    es: 'Botas FIA',
+    en: 'FIA Boots',
+  },
+  'Équipement Mécanique': {
+    pt: 'Equipamento Mecânico',
+    es: 'Equipamiento Mecánico',
+    en: 'Mechanical Equipment',
+  },
+
+  // Casques de Karting
+  'Soin et Protection': {
+    pt: 'Cuidado e Proteção',
+    es: 'Cuidado y Protección',
+    en: 'Care & Protection',
+  },
+  Lifestyle: {
+    pt: 'Lifestyle',
+    es: 'Lifestyle',
+    en: 'Lifestyle',
+  },
+  Lubrifiants: {
+    pt: 'Lubrificantes',
+    es: 'Lubricantes',
+    en: 'Lubricants',
+  },
+  'Casques de Karting': {
+    pt: 'Capacetes de Karting',
+    es: 'Cascos de Karting',
+    en: 'Karting Helmets',
+  },
+  'Gants FIA': {
+    pt: 'Luvas FIA',
+    es: 'Guantes FIA',
+    en: 'FIA Gloves',
+  },
+  'Sacs & Bagagerie': {
+    pt: 'Sacos & Bagagem',
+    es: 'Bolsas y Equipaje',
+    en: 'Bags & Luggage',
+  },
+  Additifs: {
+    pt: 'Aditivos',
+    es: 'Aditivos',
+    en: 'Additives',
+  },
+
+  // Pilote
+  'Combinaisons FIA': {
+    pt: 'Fatos FIA',
+    es: 'Monos FIA',
+    en: 'FIA Suits',
+  },
+  Pilote: {
+    pt: 'Piloto',
+    es: 'Piloto',
+    en: 'Driver',
+  },
+  Opportunités: {
+    pt: 'Oportunidades',
+    es: 'Oportunidades',
+    en: 'Deals',
+  },
+  'Sièges': {
+    pt: 'Bancos',
+    es: 'Asientos',
+    en: 'Seats',
+  },
+  'Casques de Pilote': {
+    pt: 'Capacetes de Piloto',
+    es: 'Cascos de Piloto',
+    en: 'Driver Helmets',
+  },
+  Volants: {
+    pt: 'Volantes',
+    es: 'Volantes',
+    en: 'Steering Wheels',
+  },
+  Merchandising: {
+    pt: 'Merchandising',
+    es: 'Merchandising',
+    en: 'Merchandising',
+  },
+};
+
 export async function loader({ request }: LoaderArgs) {
   const collections = await getCollections(request, { take: 20 });
   return {
@@ -12,7 +128,11 @@ export async function loader({ request }: LoaderArgs) {
 
 export default function Index() {
   const { collections } = useLoaderData<typeof loader>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // idioma atual (ex.: "pt-PT" -> "pt")
+  const rawLang = i18n.language || 'pt';
+  const lang = (rawLang.split('-')[0] as Locale) ?? 'pt';
 
   return (
     <>
@@ -59,30 +179,36 @@ export default function Index() {
           </h2>
 
           <div className="flex flex-wrap gap-3">
-            {collections.map((collection) => (
-              <Link
-                key={collection.id}
-                to={`/collections/${collection.slug}`}
-                prefetch="intent"
-                className="
-                  inline-flex items-center justify-between
-                  rounded-lg border border-red-600
-                  bg-black text-white
-                  px-4 py-3 text-sm font-medium
-                  shadow-sm
-                  hover:bg-red-600 hover:border-red-600
-                  focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white
-                  transition
-                "
-              >
-                <span className="truncate max-w-[12rem]">
-                  {collection.name}
-                </span>
-                <span className="ml-3 text-lg" aria-hidden="true">
-                  →
-                </span>
-              </Link>
-            ))}
+            {collections.map((collection) => {
+              const labelsForCollection = COLLECTION_LABELS[collection.name];
+              const label =
+                labelsForCollection?.[lang] ?? collection.name; // fallback: nome original
+
+              return (
+                <Link
+                  key={collection.id}
+                  to={`/collections/${collection.slug}`}
+                  prefetch="intent"
+                  className="
+                    inline-flex items-center justify-between
+                    rounded-lg border border-red-600
+                    bg-black text-white
+                    px-4 py-3 text-sm font-medium
+                    shadow-sm
+                    hover:bg-red-600 hover:border-red-600
+                    focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white
+                    transition
+                  "
+                >
+                  <span className="truncate max-w-[12rem]">
+                    {label}
+                  </span>
+                  <span className="ml-3 text-lg" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
