@@ -19,19 +19,36 @@ export function Header({
   const isScrollingUp = useScrollingUp();
   const { t } = useTranslation();
 
-// app/components/header/Header.tsx
-
   return (
     <header
       className={classNames(
-        // header fica sempre sticky e com z-index alto
-        'sticky top-0 z-50 bg-gradient-to-r from-zinc-700 to-gray-900 shadow-lg transform shadow-xl',
-        isScrollingUp ? 'animate-dropIn' : '',
+        isScrollingUp ? 'sticky top-0 z-10 animate-dropIn' : '',
+        'bg-gradient-to-r from-zinc-700 to-gray-900 shadow-lg transform shadow-xl',
       )}
     >
+
+{/* Barra superior só com o login/conta, sem texto promocional */}
+<div className="bg-zinc-900 text-gray-100 text-sm py-2 px-2 xl:px-0">
+  <div className="max-w-6xl mx-auto flex items-center justify-end">
+    <Link
+      to={isSignedIn ? '/account' : '/sign-in'}
+      className="flex items-center space-x-1"
+    >
+      <UserIcon className="w-4 h-4" />
+      <span>
+        {isSignedIn ? t('account.myAccount') : t('account.signIn')}
+      </span>
+    </Link>
+  </div>
+</div>
+
+
+
       <div className="max-w-6xl mx-auto p-4 flex items-center space-x-4">
-        <h1 className="text-white w-10">
-          <Link to="/">
+
+
+<h1 className="text-white w-10">
+  <Link to="/">
 <img
   src="/logocars.png"
   width={50}
@@ -39,8 +56,10 @@ export function Header({
   className="object-contain"
   alt="Cars and Vibes Logo"
 />
-          </Link>
-        </h1>
+  </Link>
+</h1>
+
+
         <div className="flex space-x-4 hidden sm:block">
           {data.collections.map((collection) => (
             <Link
@@ -76,3 +95,4 @@ export function Header({
     </header>
   );
 }
+

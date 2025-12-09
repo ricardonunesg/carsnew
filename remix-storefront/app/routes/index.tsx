@@ -166,52 +166,6 @@ export default function Index() {
       </section>
 
       {/* LISTA DE CATEGORIAS – estilo “chips” vermelhos */}
-      <section
-        aria-labelledby="category-heading"
-        className="py-16 bg-white"
-      >
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <h2
-            id="category-heading"
-            className="text-2xl font-semibold tracking-tight text-gray-900 mb-6"
-          >
-            {t('common.shopByCategory')}
-          </h2>
-
-          <div className="flex flex-wrap gap-3">
-            {collections.map((collection) => {
-              const labelsForCollection = COLLECTION_LABELS[collection.name];
-              const label =
-                labelsForCollection?.[lang] ?? collection.name; // fallback: nome original
-
-              return (
-                <Link
-                  key={collection.id}
-                  to={`/collections/${collection.slug}`}
-                  prefetch="intent"
-                  className="
-                    inline-flex items-center justify-between
-                    rounded-lg border border-red-600
-                    bg-black text-white
-                    px-4 py-3 text-sm font-medium
-                    shadow-sm
-                    hover:bg-red-600 hover:border-red-600
-                    focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white
-                    transition
-                  "
-                >
-                  <span className="truncate max-w-[12rem]">
-                    {label}
-                  </span>
-                  <span className="ml-3 text-lg" aria-hidden="true">
-                    →
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </section>
     </>
   );
 }
