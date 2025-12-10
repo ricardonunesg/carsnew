@@ -1,54 +1,60 @@
-import { SearchFacetValuesQuery, SearchQuery } from '~/generated/graphql';
+import type { SearchQuery } from '~/generated/graphql';
+
+type SearchResult = SearchQuery['search'];
+
+export interface FacetOption {
+  id: string;
+  name: string;
+  selected: boolean;
+}
 
 export interface FacetWithValues {
   id: string;
   name: string;
-  values: Array<{
-    id: string;
-    name: string;
-    selected: boolean;
-  }>;
+  values: FacetOption[];
 }
 
+/**
+ * Junta os facetValues devolvidos pelo search em grupos por facet
+ * (ex.: "Categoria Principal", "Marca", "Subcategoria", etc.)
+ * e marca quais estão selecionados.
+ */
 export class FacetFilterTracker {
   private _facetsWithValues: FacetWithValues[] = [];
 
-  get facetsWithValues() {
+  get facetsWithValues(): FacetWithValues[] {
     return this._facetsWithValues;
   }
 
+  /**
+   * withoutFilters = resultado do search SEM facetValueIds aplicados
+   * current       = resultado do search COM os filtros atuais
+   */
   update(
-    searchResult: SearchQuery['search'],
-    resultWithoutFacetValueFilters: SearchFacetValuesQuery['search'],
-    activeFacetValueIds: string[],
-  ) {
-    this._facetsWithValues = this.groupFacetValues(
-      resultWithoutFacetValueFilters,
-      searchResult.facetValues,
-      activeFacetValueIds,
-    );
+    withoutFilters: SearchResult,
+    current: SearchResult | null,
+  ): void {
+    this._facetsWithValues = this.groupFacetValues(withoutFilters, current);
   }
 
   private groupFacetValues(
-    withoutFilters: SearchFacetValuesQuery['search'],
-    current: SearchQuery['search']['facetValues'] | null,
-    activeFacetValueIds: string[],
+    withoutFilters: SearchResult,
+    current: SearchResult | null,
   ): FacetWithValues[] {
-    if (!current) {
-      return [];
-    }
     const facetMap = new Map<string, FacetWithValues>();
-    for (const {
-      facetValue: { id, name, facet },
-      count,
-    } of withoutFilters.facetValues) {
-      if (count === withoutFilters.totalItems) {
-        continue;
-      }
-      const facetFromMap = facetMap.get(facet.id);
-      const selected = activeFacetValueIds.includes(id);
-      if (facetFromMap) {
-        facetFromMap.values.push({ id, name, selected });
+
+    // ids dos facetValues atualmente selecionados
+    const selectedIds = new Set(
+      (current?.facetValues ?? []).map((fv) => fv.facetValue.id),
+    );
+
+    for (const { facetValue } of withoutFilters.facetValues) {
+      const { id, name, facet } = facetValue;
+      const selected = selectedIds.has(id);
+
+      const existing = facetMap.get(facet.id);
+      if (existing) {
+        existing.values.push({ id, name, selected });
       } else {
         facetMap.set(facet.id, {
           id: facet.id,
@@ -57,6 +63,8 @@ export class FacetFilterTracker {
         });
       }
     }
+
+    // podes ordenar aqui se quiseres, mas não é obrigatório
     return Array.from(facetMap.values());
   }
 }

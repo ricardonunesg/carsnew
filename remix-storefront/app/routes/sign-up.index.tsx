@@ -7,37 +7,60 @@ import {
   RegisterValidationErrors,
   validateRegistrationForm,
 } from '~/utils/registration-helper';
-import { API_URL, DEMO_API_URL } from '~/constants';
 import { useTranslation } from 'react-i18next';
-import { getFixedT } from '~/i18next.server';
 
+/**
+ * ACTION: trata do submit do formulário de registo
+ */
 export async function action({ request }: ActionFunctionArgs) {
-  if (API_URL === DEMO_API_URL) {
-    const t = await getFixedT(request);
-
-    return {
-      form: t('vendure.registrationError'),
-    };
-  }
-
   const body = await request.formData();
+
+  // 1) Validação básica do formulário (campos vazios, passwords diferentes, etc.)
   const fieldErrors = validateRegistrationForm(body);
   if (Object.keys(fieldErrors).length !== 0) {
     return fieldErrors;
   }
 
+  // 2) Chamada ao Vendure para criar a conta do cliente
   const variables = extractRegistrationFormValues(body);
   const result = await registerCustomerAccount({ request }, variables);
+
   if (result.__typename === 'Success') {
+    // Registo ok → redireciona para página de sucesso
     return redirect('/sign-up/success');
-  } else {
-    const formError: RegisterValidationErrors = {
-      form: result.errorCode,
-    };
-    return json(formError, { status: 401 });
   }
+
+  // 3) Erros vindos do Vendure – transformamos numa mensagem legível
+  let message = 'Ocorreu um problema ao criar a sua conta. Tente novamente.';
+
+  switch (result.__typename) {
+    case 'EmailAddressConflictError':
+      message = 'Este endereço de email já está registado.';
+      break;
+    case 'PasswordValidationError':
+      message =
+        result.validationErrorMessage ??
+        'A palavra-passe não cumpre os requisitos mínimos.';
+      break;
+    case 'NativeAuthStrategyError':
+      message = 'Não foi possível autenticar. Verifique os dados e tente novamente.';
+      break;
+    default:
+      if ((result as any).message) {
+        message = (result as any).message;
+      }
+  }
+
+  const formError: RegisterValidationErrors = {
+    form: message,
+  };
+
+  return json(formError, { status: 400 });
 }
 
+/**
+ * PAGE COMPONENT
+ */
 export default function SignUpPage() {
   const [searchParams] = useSearchParams();
   const formErrors = useActionData<RegisterValidationErrors>();
@@ -63,15 +86,16 @@ export default function SignUpPage() {
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            <div className="bg-yellow-50 border border-yellow-400 text-yellow-800 rounded p-4 text-center text-sm">
-              <p>{t('vendure.registrationMessage')}</p>
-            </div>
+            {/* 🔥 REMOVIDO o banner amarelo da demo */}
+
             <Form className="space-y-6" method="post">
               <input
                 type="hidden"
                 name="redirectTo"
                 value={searchParams.get('redirectTo') ?? undefined}
               />
+
+              {/* EMAIL */}
               <div>
                 <label
                   htmlFor="email"
@@ -85,6 +109,7 @@ export default function SignUpPage() {
                     name="email"
                     type="email"
                     autoComplete="email"
+                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                   {formErrors?.email && (
@@ -95,6 +120,7 @@ export default function SignUpPage() {
                 </div>
               </div>
 
+              {/* FIRST NAME */}
               <div>
                 <label
                   htmlFor="firstName"
@@ -108,11 +134,13 @@ export default function SignUpPage() {
                     name="firstName"
                     type="text"
                     autoComplete="given-name"
+                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                 </div>
               </div>
 
+              {/* LAST NAME */}
               <div>
                 <label
                   htmlFor="lastName"
@@ -126,11 +154,13 @@ export default function SignUpPage() {
                     name="lastName"
                     type="text"
                     autoComplete="family-name"
+                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                 </div>
               </div>
 
+              {/* PASSWORD */}
               <div>
                 <label
                   htmlFor="password"
@@ -143,7 +173,8 @@ export default function SignUpPage() {
                     id="password"
                     name="password"
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
+                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                   {formErrors?.password && (
@@ -153,6 +184,8 @@ export default function SignUpPage() {
                   )}
                 </div>
               </div>
+
+              {/* REPEAT PASSWORD */}
               <div>
                 <label
                   htmlFor="repeatPassword"
@@ -165,7 +198,8 @@ export default function SignUpPage() {
                     id="repeatPassword"
                     name="repeatPassword"
                     type="password"
-                    autoComplete="current-password"
+                    autoComplete="new-password"
+                    required
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                   {formErrors?.repeatPassword && (
@@ -175,6 +209,8 @@ export default function SignUpPage() {
                   )}
                 </div>
               </div>
+
+              {/* ERRO GERAL DE FORMULÁRIO */}
               {formErrors?.form && (
                 <div className="rounded-md bg-red-50 p-4">
                   <div className="flex">
@@ -196,6 +232,7 @@ export default function SignUpPage() {
                 </div>
               )}
 
+              {/* SUBMIT */}
               <div>
                 <button
                   type="submit"
