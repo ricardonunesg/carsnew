@@ -1,15 +1,15 @@
 import {
-  dummyPaymentHandler,
+  VendureConfig,
   DefaultJobQueuePlugin,
   DefaultSchedulerPlugin,
-  VendureConfig,
-  facetValueCollectionFilter, // 👈 ADICIONADO
+  dummyPaymentHandler,
+  facetValueCollectionFilter,
 } from '@vendure/core';
 import { ElasticsearchPlugin } from '@vendure/elasticsearch-plugin';
 import {
-  defaultEmailHandlers,
   EmailPlugin,
   FileBasedTemplateLoader,
+  defaultEmailHandlers,
 } from '@vendure/email-plugin';
 import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { AdminUiPlugin } from '@vendure/admin-ui-plugin';
@@ -27,7 +27,16 @@ export const config: VendureConfig = {
     hostname: '0.0.0.0',
     trustProxy: 1,
 
-    // 🔥 ATIVAR PLAYGROUND + DEBUG (Admin & Shop)
+    // ✅ CORS – permitir a storefront em duckdns
+    cors: {
+      origin: [
+        'http://localhost:3000',            // opcional para dev local
+        'https://carsandvibes.duckdns.org', // storefront em produção
+      ],
+      credentials: true,
+    },
+
+    // Playgrounds & debug
     adminApiPlayground: {
       settings: {
         'request.credentials': 'include',
@@ -45,10 +54,20 @@ export const config: VendureConfig = {
   },
 
   authOptions: {
-    tokenMethod: 'cookie',
+    // 👇 o Remix starter espera bearer token
+    tokenMethod: ['bearer', 'cookie'],
+    requireVerification: false,
     superadminCredentials: {
       identifier: 'superadmin',
       password: 'superadmin',
+    },
+    cookieOptions: {
+      secret: process.env.COOKIE_SECRET || 'dev-cookie-secret',
+      httpOnly: true,
+      sameSite: 'lax',
+      // Mesmo estando atrás de HTTPS, secure:false funciona
+      // (o cookie continua a ser enviado em HTTPS)
+      secure: false,
     },
   },
 
@@ -67,7 +86,6 @@ export const config: VendureConfig = {
     paymentMethodHandlers: [dummyPaymentHandler],
   },
 
-  // 👇 AQUI REGISTAMOS O FILTRO DE COLLECTIONS
   catalogOptions: {
     collectionFilters: [facetValueCollectionFilter],
   },
